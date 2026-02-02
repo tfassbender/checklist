@@ -68,7 +68,7 @@ class AuthResourceTest {
                 .then()
                 .statusCode(200)
                 .body("token", notNullValue())
-                .body("username", equalTo("testuser"));
+                .body("username", equalTo("TestUser"));
     }
 
     @Test

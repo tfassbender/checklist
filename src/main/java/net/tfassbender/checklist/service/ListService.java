@@ -211,7 +211,7 @@ public class ListService {
 
     private boolean listNameExists(String username, String name, String excludeId) {
         return storageService.loadAllLists(username).stream()
-                .filter(list -> excludeId == null || !list.getId().equals(excludeId))
+                .filter(list -> !list.getId().equals(excludeId))
                 .anyMatch(list -> list.getName().equalsIgnoreCase(name));
     }
 

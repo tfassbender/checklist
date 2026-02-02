@@ -17,7 +17,10 @@ public class AuthService {
     @Inject
     JwtService jwtService;
 
-    public String register(String username, String password) throws AuthException {
+    public record AuthResult(String token, String username) {
+    }
+
+    public AuthResult register(String username, String password) throws AuthException {
         if (username == null || username.trim().isEmpty()) {
             throw new AuthException("Username is required");
         }
@@ -25,7 +28,8 @@ public class AuthService {
             throw new AuthException("Password must be at least 4 characters");
         }
 
-        String normalizedUsername = username.trim().toLowerCase();
+        String trimmedUsername = username.trim();
+        String normalizedUsername = trimmedUsername.toLowerCase();
 
         if (!normalizedUsername.matches("^[a-zA-Z0-9_]+$")) {
             throw new AuthException("Username can only contain letters, numbers, and underscores");
@@ -36,7 +40,7 @@ public class AuthService {
         }
 
         String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
-        User user = new User(normalizedUsername, passwordHash);
+        User user = new User(trimmedUsername, passwordHash);
 
         try {
             storageService.saveUser(user);
@@ -44,10 +48,10 @@ public class AuthService {
             throw new AuthException("Failed to create user");
         }
 
-        return jwtService.generateToken(normalizedUsername);
+        return new AuthResult(jwtService.generateToken(trimmedUsername), trimmedUsername);
     }
 
-    public String login(String username, String password) throws AuthException {
+    public AuthResult login(String username, String password) throws AuthException {
         if (username == null || username.trim().isEmpty()) {
             throw new AuthException("Username is required");
         }
@@ -64,7 +68,8 @@ public class AuthService {
             throw new AuthException("Invalid username or password");
         }
 
-        return jwtService.generateToken(normalizedUsername);
+        String actualUsername = user.getUsername();
+        return new AuthResult(jwtService.generateToken(actualUsername), actualUsername);
     }
 
     public static class AuthException extends Exception {
