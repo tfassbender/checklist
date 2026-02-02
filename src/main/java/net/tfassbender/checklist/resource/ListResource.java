@@ -98,4 +98,30 @@ public class ListResource {
                     .build();
         }
     }
+
+    @PUT
+    @Path("/{id}/activate")
+    public Response activateList(@PathParam("id") String id) {
+        try {
+            CheckList list = listService.activateList(getUsername(), id);
+            return Response.ok(list).build();
+        } catch (ListService.ListException e) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorResponse(e.getMessage(), 404))
+                    .build();
+        }
+    }
+
+    @PUT
+    @Path("/{id}/deactivate")
+    public Response deactivateList(@PathParam("id") String id) {
+        try {
+            CheckList list = listService.deactivateList(getUsername(), id);
+            return Response.ok(list).build();
+        } catch (ListService.ListException e) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorResponse(e.getMessage(), 404))
+                    .build();
+        }
+    }
 }

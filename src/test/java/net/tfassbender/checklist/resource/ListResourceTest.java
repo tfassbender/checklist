@@ -498,4 +498,342 @@ class ListResourceTest {
                 .statusCode(200)
                 .body("size()", equalTo(0));
     }
+
+    @Test
+    void testDeactivateList() {
+        // Create a list
+        Response createResponse = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "name": "Test List"
+                        }
+                        """)
+                .post("/api/lists");
+
+        String listId = createResponse.jsonPath().getString("id");
+
+        // Add some items
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "description": "Item 1"
+                        }
+                        """)
+                .post("/api/lists/" + listId + "/items");
+
+        Response item2Response = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "description": "Item 2"
+                        }
+                        """)
+                .post("/api/lists/" + listId + "/items");
+
+        String item2Id = item2Response.jsonPath().getString("id");
+
+        // Check one item
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "description": "Item 2",
+                            "checked": true
+                        }
+                        """)
+                .put("/api/lists/" + listId + "/items/" + item2Id);
+
+        // Deactivate the list
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .when()
+                .put("/api/lists/" + listId + "/deactivate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(false))
+                .body("items.size()", equalTo(2))
+                .body("items.every { it.checked == false }", equalTo(true));
+    }
+
+    @Test
+    void testDeactivateListIsIdempotent() {
+        // Create and deactivate a list
+        Response createResponse = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "name": "Test List"
+                        }
+                        """)
+                .post("/api/lists");
+
+        String listId = createResponse.jsonPath().getString("id");
+
+        // Deactivate once
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/deactivate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(false));
+
+        // Deactivate again - should still succeed and be inactive
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/deactivate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(false));
+    }
+
+    @Test
+    void testActivateList() {
+        // Create and deactivate a list
+        Response createResponse = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "name": "Test List"
+                        }
+                        """)
+                .post("/api/lists");
+
+        String listId = createResponse.jsonPath().getString("id");
+
+        // Deactivate
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/deactivate");
+
+        // Activate the list
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .when()
+                .put("/api/lists/" + listId + "/activate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(true));
+    }
+
+    @Test
+    void testActivateListIsIdempotent() {
+        // Create a list (already active by default)
+        Response createResponse = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "name": "Test List"
+                        }
+                        """)
+                .post("/api/lists");
+
+        String listId = createResponse.jsonPath().getString("id");
+
+        // Activate when already active - should still succeed
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/activate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(true));
+
+        // Activate again - should still succeed
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/activate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(true));
+    }
+
+    @Test
+    void testActivateListNotFound() {
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .when()
+                .put("/api/lists/nonexistent-id/activate")
+                .then()
+                .statusCode(404)
+                .body("status", equalTo(404));
+    }
+
+    @Test
+    void testDeactivateListNotFound() {
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .when()
+                .put("/api/lists/nonexistent-id/deactivate")
+                .then()
+                .statusCode(404)
+                .body("status", equalTo(404));
+    }
+
+    @Test
+    void testActivateDeactivateCycle() {
+        // Create a list
+        Response createResponse = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "name": "Test List"
+                        }
+                        """)
+                .post("/api/lists");
+
+        String listId = createResponse.jsonPath().getString("id");
+
+        // Verify initially active
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .get("/api/lists/" + listId)
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(true));
+
+        // Deactivate
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/deactivate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(false));
+
+        // Activate again
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/activate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(true));
+
+        // Deactivate again
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/deactivate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(false));
+    }
+
+    @Test
+    void testDeactivateResetsCheckedItems() {
+        // Create a list with checked items
+        Response createResponse = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "name": "Test List"
+                        }
+                        """)
+                .post("/api/lists");
+
+        String listId = createResponse.jsonPath().getString("id");
+
+        // Add items and check them
+        Response item1Response = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "description": "Item 1"
+                        }
+                        """)
+                .post("/api/lists/" + listId + "/items");
+
+        String item1Id = item1Response.jsonPath().getString("id");
+
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "description": "Item 1",
+                            "checked": true
+                        }
+                        """)
+                .put("/api/lists/" + listId + "/items/" + item1Id);
+
+        // Verify item is checked
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .get("/api/lists/" + listId)
+                .then()
+                .body("items[0].checked", equalTo(true));
+
+        // Deactivate - should reset items
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/deactivate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(false))
+                .body("items[0].checked", equalTo(false));
+    }
+
+    @Test
+    void testActivateDoesNotResetItems() {
+        // Create, add items, check them, deactivate, then activate
+        Response createResponse = given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "name": "Test List"
+                        }
+                        """)
+                .post("/api/lists");
+
+        String listId = createResponse.jsonPath().getString("id");
+
+        // Add item (will be unchecked by default after we deactivate)
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "description": "Item 1"
+                        }
+                        """)
+                .post("/api/lists/" + listId + "/items");
+
+        // Deactivate (resets items to unchecked)
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/deactivate");
+
+        // Activate - should NOT change item checked state
+        given()
+                .header("Authorization", "Bearer " + authToken)
+                .contentType(ContentType.JSON)
+                .put("/api/lists/" + listId + "/activate")
+                .then()
+                .statusCode(200)
+                .body("active", equalTo(true))
+                .body("items[0].checked", equalTo(false));
+    }
 }

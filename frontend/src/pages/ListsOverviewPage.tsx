@@ -1,14 +1,77 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
 import { useLists } from '../hooks/useLists'
 import ListCard from '../components/ListCard'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { AuthContext } from '../context/AuthContext'
+import * as api from '../services/api'
 
 export default function ListsOverviewPage() {
+  const authContext = useContext(AuthContext)
+  const username = authContext?.username || 'User'
   const { lists, isLoading, error, createList, deleteList, fetchLists } = useLists()
   const [isCreating, setIsCreating] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deactivateTarget, setDeactivateTarget] = useState<{ id: string; name: string } | null>(null)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Filter lists by search query
+  const filteredLists = searchQuery.trim()
+    ? lists.filter(list =>
+        list.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : lists
+
+  const activeLists = filteredLists.filter(list => list.active)
+  const inactiveLists = filteredLists.filter(list => !list.active)
+
+  // Calculate incomplete active lists (have items but not all are checked)
+  const incompleteActiveLists = activeLists.filter(
+    list => list.itemCount > 0 && list.checkedCount < list.itemCount
+  )
+
+  // Check if all active lists are completed
+  const allActiveListsCompleted =
+    activeLists.length > 0 &&
+    activeLists.every(list => list.itemCount > 0 && list.checkedCount === list.itemCount)
+
+  // Generate status text
+  const getStatusText = () => {
+    if (lists.length === 0) return 'Create your first checklist'
+
+    const activeCount = activeLists.length
+    const inactiveCount = inactiveLists.length
+    const incompleteCount = incompleteActiveLists.length
+
+    const parts = []
+
+    if (activeCount > 0) {
+      const activeText = `${activeCount} Active ${activeCount === 1 ? 'List' : 'Lists'}`
+      if (incompleteCount > 0) {
+        const incompleteText = incompleteCount === 1 ? '1 incomplete' : `${incompleteCount} incomplete`
+        parts.push(`${activeText} (${incompleteText})`)
+      } else {
+        parts.push(activeText)
+      }
+    }
+
+    if (inactiveCount > 0) {
+      parts.push(`${inactiveCount} Inactive ${inactiveCount === 1 ? 'List' : 'Lists'}`)
+    }
+
+    if (parts.length === 0) return 'No lists'
+
+    const result = parts.join(' and ')
+
+    // Add filter info if searching
+    if (searchQuery.trim()) {
+      return `${result} (filtered from ${lists.length} total)`
+    }
+
+    return result
+  }
 
   const handleCreateList = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,6 +99,36 @@ export default function ListsOverviewPage() {
     }
   }
 
+  const handleToggleActive = async (id: string) => {
+    const list = lists.find(l => l.id === id)
+    if (!list) return
+
+    // If list is active, show confirmation before deactivating
+    if (list.active) {
+      setDeactivateTarget({ id, name: list.name })
+      return
+    }
+
+    // If inactive, activate immediately without confirmation
+    try {
+      await api.activateList(id)
+      await fetchLists()
+    } catch (err) {
+      console.error('Failed to activate list:', err)
+    }
+  }
+
+  const handleDeactivateList = async () => {
+    if (!deactivateTarget) return
+    try {
+      await api.deactivateList(deactivateTarget.id)
+      await fetchLists()
+      setDeactivateTarget(null)
+    } catch (err) {
+      console.error('Failed to deactivate list:', err)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -60,14 +153,68 @@ export default function ListsOverviewPage() {
   return (
     <div className="max-w-4xl mx-auto p-4 pb-24">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          My Lists
-        </h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {username.endsWith('s') ? `${username}'` : `${username}'s`} Lists
+          </h1>
+          <button
+            onClick={() => {
+              setShowSearch(!showSearch)
+              if (showSearch) {
+                setSearchQuery('')
+              }
+            }}
+            className="btn-icon"
+            title={showSearch ? 'Hide search' : 'Search lists'}
+          >
+            <svg
+              className="w-5 h-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+          </button>
+        </div>
+
+        {showSearch && (
+          <div className="mb-4">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search lists..."
+              className="input w-full"
+              autoFocus
+            />
+          </div>
+        )}
+
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          {lists.length === 0
-            ? 'Create your first checklist'
-            : `${lists.length} list${lists.length === 1 ? '' : 's'}`}
+          {getStatusText()}
         </p>
+        {allActiveListsCompleted && (
+          <div className="flex items-center gap-2 mt-2 text-green-600 dark:text-green-400">
+            <svg
+              className="w-5 h-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <span className="text-sm font-medium">All active lists completed</span>
+          </div>
+        )}
       </div>
 
       {isCreating && (
@@ -134,21 +281,83 @@ export default function ListsOverviewPage() {
             Create List
           </button>
         </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {lists.map(list => (
-            <ListCard
-              key={list.id}
-              list={list}
-              onDelete={id => {
-                const target = lists.find(l => l.id === id)
-                if (target) {
-                  setDeleteTarget({ id, name: target.name })
-                }
-              }}
-            />
-          ))}
+      ) : filteredLists.length === 0 && searchQuery.trim() ? (
+        <div className="card p-8 text-center">
+          <svg
+            className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-500"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            No lists found
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            No lists match "{searchQuery}"
+          </p>
+          <button
+            onClick={() => setSearchQuery('')}
+            className="btn btn-secondary"
+          >
+            Clear Search
+          </button>
         </div>
+      ) : (
+        <>
+          {/* Active Lists Section */}
+          {activeLists.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Active Lists
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {activeLists.map(list => (
+                  <ListCard
+                    key={list.id}
+                    list={list}
+                    onDelete={id => {
+                      const target = lists.find(l => l.id === id)
+                      if (target) {
+                        setDeleteTarget({ id, name: target.name })
+                      }
+                    }}
+                    onToggleActive={handleToggleActive}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Inactive Lists Section */}
+          {inactiveLists.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Inactive Lists
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {inactiveLists.map(list => (
+                  <ListCard
+                    key={list.id}
+                    list={list}
+                    onDelete={id => {
+                      const target = lists.find(l => l.id === id)
+                      if (target) {
+                        setDeleteTarget({ id, name: target.name })
+                      }
+                    }}
+                    onToggleActive={handleToggleActive}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {!isCreating && lists.length > 0 && (
@@ -182,6 +391,15 @@ export default function ListsOverviewPage() {
         confirmVariant="danger"
         onConfirm={handleDeleteList}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={!!deactivateTarget}
+        title="Deactivate List"
+        message={`Are you sure you want to deactivate "${deactivateTarget?.name}"? This will uncheck all items in the list.`}
+        confirmText="Deactivate"
+        onConfirm={handleDeactivateList}
+        onCancel={() => setDeactivateTarget(null)}
       />
     </div>
   )

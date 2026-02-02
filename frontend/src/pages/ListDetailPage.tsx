@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -20,6 +20,7 @@ import CheckListItemComponent from '../components/CheckListItem'
 import EditableItem from '../components/EditableItem'
 import NotesSection from '../components/NotesSection'
 import ConfirmDialog from '../components/ConfirmDialog'
+import * as api from '../services/api'
 
 export default function ListDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -28,6 +29,7 @@ export default function ListDetailPage() {
     list,
     isLoading,
     error,
+    fetchList,
     updateList,
     resetList,
     addItem,
@@ -41,7 +43,11 @@ export default function ListDetailPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [newItemText, setNewItemText] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
+  const hasInitializedEditMode = useRef(false)
+  const addItemInputRef = useRef<HTMLInputElement>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -53,6 +59,16 @@ export default function ListDetailPage() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  // Automatically enter edit mode for empty lists
+  useEffect(() => {
+    if (list && !hasInitializedEditMode.current) {
+      hasInitializedEditMode.current = true
+      if (list.items.length === 0) {
+        setEditMode(true)
+      }
+    }
+  }, [list])
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -79,10 +95,25 @@ export default function ListDetailPage() {
 
     await addItem(description)
     setNewItemText('')
+
+    // Scroll the input field into view after adding an item
+    setTimeout(() => {
+      addItemInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
   }
 
   const handleToggleItem = async (itemId: string, checked: boolean) => {
     await updateItem(itemId, { checked })
+
+    // If checking an item in an inactive list, activate it automatically
+    if (checked && list && !list.active && id) {
+      try {
+        await api.activateList(id)
+        await fetchList()
+      } catch (err) {
+        console.error('Failed to auto-activate list:', err)
+      }
+    }
   }
 
   const handleEditItem = async (itemId: string, description: string) => {
@@ -100,12 +131,46 @@ export default function ListDetailPage() {
   }
 
   const handleUpdateName = async (name: string) => {
-    await updateList({ name })
-    setIsEditingName(false)
+    try {
+      setRenameError(null)
+      await updateList({ name })
+      setIsEditingName(false)
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : 'Failed to update list name')
+    }
   }
 
   const handleUpdateNotes = async (notes: string) => {
     await updateList({ notes })
+  }
+
+  const handleToggleActive = async () => {
+    if (!list || !id) return
+
+    // If list is active, show confirmation before deactivating
+    if (list.active) {
+      setShowDeactivateConfirm(true)
+      return
+    }
+
+    // If inactive, activate immediately without confirmation
+    try {
+      await api.activateList(id)
+      await fetchList() // Refetch list data
+    } catch (err) {
+      console.error('Failed to activate list:', err)
+    }
+  }
+
+  const handleDeactivate = async () => {
+    if (!id) return
+    try {
+      await api.deactivateList(id)
+      setShowDeactivateConfirm(false)
+      await fetchList() // Refetch list data
+    } catch (err) {
+      console.error('Failed to deactivate list:', err)
+    }
   }
 
   if (isLoading) {
@@ -158,13 +223,34 @@ export default function ListDetailPage() {
           </svg>
         </button>
 
+        {list.active && allChecked && (
+          <span className="text-green-500">
+            <svg
+              className="w-6 h-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </span>
+        )}
+
         <div className="flex-1">
           {isEditingName ? (
             <EditableItem
               value={list.name}
               onSave={handleUpdateName}
-              onCancel={() => setIsEditingName(false)}
+              onCancel={() => {
+                setIsEditingName(false)
+                setRenameError(null)
+              }}
               placeholder="List name"
+              error={renameError}
             />
           ) : (
             <button
@@ -255,6 +341,7 @@ export default function ListDetailPage() {
       {editMode && (
         <form onSubmit={handleAddItem} className="flex gap-2 mb-6">
           <input
+            ref={addItemInputRef}
             type="text"
             value={newItemText}
             onChange={e => setNewItemText(e.target.value)}
@@ -276,8 +363,26 @@ export default function ListDetailPage() {
       {totalCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800
                         border-t border-gray-200 dark:border-gray-700 p-4">
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/')}
+                className="btn-icon"
+                title="Back to lists"
+              >
+                <svg
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="19" y1="12" x2="5" y2="12" />
+                  <polyline points="12 19 5 12 12 5" />
+                </svg>
+              </button>
               {allChecked && (
                 <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
                   <svg
@@ -296,13 +401,21 @@ export default function ListDetailPage() {
                 </span>
               )}
             </div>
-            <button
-              onClick={() => setShowResetConfirm(true)}
-              className="btn btn-secondary"
-              disabled={checkedCount === 0}
-            >
-              Reset
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleToggleActive}
+                className="btn btn-secondary"
+              >
+                {list?.active ? 'Deactivate' : 'Activate'}
+              </button>
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                className="btn btn-secondary"
+                disabled={checkedCount === 0}
+              >
+                Reset
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -314,6 +427,15 @@ export default function ListDetailPage() {
         confirmText="Reset"
         onConfirm={handleReset}
         onCancel={() => setShowResetConfirm(false)}
+      />
+
+      <ConfirmDialog
+        isOpen={showDeactivateConfirm}
+        title="Deactivate List"
+        message={`Are you sure you want to deactivate "${list?.name}"? This will uncheck all items in the list.`}
+        confirmText="Deactivate"
+        onConfirm={handleDeactivate}
+        onCancel={() => setShowDeactivateConfirm(false)}
       />
     </div>
   )

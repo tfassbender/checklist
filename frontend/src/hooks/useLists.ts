@@ -33,6 +33,7 @@ export function useLists() {
         name: newList.name,
         itemCount: 0,
         checkedCount: 0,
+        active: newList.active,
         updatedAt: newList.updatedAt,
       },
     ])

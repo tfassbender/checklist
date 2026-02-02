@@ -9,6 +9,7 @@ public class CheckList {
     private String id;
     private String name;
     private String notes;
+    private boolean active;
     private Instant createdAt;
     private Instant updatedAt;
     private List<CheckListItem> items;
@@ -16,6 +17,7 @@ public class CheckList {
     public CheckList() {
         this.id = UUID.randomUUID().toString();
         this.notes = "";
+        this.active = true;
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
         this.items = new ArrayList<>();
@@ -72,6 +74,14 @@ public class CheckList {
 
     public void setItems(List<CheckListItem> items) {
         this.items = items;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 
     public void touch() {

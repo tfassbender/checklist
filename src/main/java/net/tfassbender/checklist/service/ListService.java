@@ -105,6 +105,46 @@ public class ListService {
         return list;
     }
 
+    public CheckList activateList(String username, String listId) throws ListException {
+        CheckList list = storageService.loadList(username, listId)
+                .orElseThrow(() -> new ListException("List not found"));
+
+        // Idempotent: only update if not already active
+        if (!list.isActive()) {
+            list.setActive(true);
+            list.touch();
+
+            try {
+                storageService.saveList(username, list);
+            } catch (IOException e) {
+                throw new ListException("Failed to activate list");
+            }
+        }
+
+        return list;
+    }
+
+    public CheckList deactivateList(String username, String listId) throws ListException {
+        CheckList list = storageService.loadList(username, listId)
+                .orElseThrow(() -> new ListException("List not found"));
+
+        // Idempotent: only update if not already inactive
+        if (list.isActive()) {
+            list.setActive(false);
+            // Reset all items to unchecked when deactivating
+            list.getItems().forEach(item -> item.setChecked(false));
+            list.touch();
+
+            try {
+                storageService.saveList(username, list);
+            } catch (IOException e) {
+                throw new ListException("Failed to deactivate list");
+            }
+        }
+
+        return list;
+    }
+
     public CheckListItem addItem(String username, String listId, String description) throws ListException {
         if (description == null || description.trim().isEmpty()) {
             throw new ListException("Item description is required");

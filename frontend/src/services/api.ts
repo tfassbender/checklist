@@ -110,6 +110,18 @@ export async function resetList(id: string): Promise<CheckList> {
   })
 }
 
+export async function activateList(id: string): Promise<CheckList> {
+  return fetchApi<CheckList>(`/lists/${id}/activate`, {
+    method: 'PUT',
+  })
+}
+
+export async function deactivateList(id: string): Promise<CheckList> {
+  return fetchApi<CheckList>(`/lists/${id}/deactivate`, {
+    method: 'PUT',
+  })
+}
+
 // Item endpoints
 export async function addItem(
   listId: string,

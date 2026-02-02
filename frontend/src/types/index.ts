@@ -13,6 +13,7 @@ export interface CheckList {
   id: string;
   name: string;
   notes: string;
+  active: boolean;
   createdAt: string;
   updatedAt: string;
   items: CheckListItem[];
@@ -23,6 +24,7 @@ export interface CheckListSummary {
   name: string;
   itemCount: number;
   checkedCount: number;
+  active: boolean;
   updatedAt: string;
 }
 

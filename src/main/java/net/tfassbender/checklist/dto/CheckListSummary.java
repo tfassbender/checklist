@@ -10,6 +10,7 @@ public record CheckListSummary(
         String name,
         int itemCount,
         int checkedCount,
+        boolean active,
         Instant updatedAt
 ) {
     public static CheckListSummary fromCheckList(CheckList list) {
@@ -18,6 +19,7 @@ public record CheckListSummary(
                 list.getName(),
                 list.getItems().size(),
                 (int) list.getItems().stream().filter(CheckListItem::isChecked).count(),
+                list.isActive(),
                 list.getUpdatedAt()
         );
     }
