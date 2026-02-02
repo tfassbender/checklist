@@ -39,7 +39,6 @@ export default function ListDetailPage() {
 
   const [editMode, setEditMode] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [isAddingItem, setIsAddingItem] = useState(false)
   const [newItemText, setNewItemText] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
@@ -253,7 +252,7 @@ export default function ListDetailPage() {
       </div>
 
       {/* Add Item */}
-      {isAddingItem || editMode ? (
+      {editMode && (
         <form onSubmit={handleAddItem} className="flex gap-2 mb-6">
           <input
             type="text"
@@ -261,7 +260,7 @@ export default function ListDetailPage() {
             onChange={e => setNewItemText(e.target.value)}
             placeholder="Add new item..."
             className="input flex-1"
-            autoFocus={isAddingItem}
+            autoFocus
           />
           <button
             type="submit"
@@ -270,28 +269,7 @@ export default function ListDetailPage() {
           >
             Add
           </button>
-          {!editMode && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddingItem(false)
-                setNewItemText('')
-              }}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-          )}
         </form>
-      ) : (
-        <button
-          onClick={() => setIsAddingItem(true)}
-          className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600
-                     rounded-lg text-gray-600 dark:text-gray-400 hover:border-primary-500
-                     hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-        >
-          + Add item
-        </button>
       )}
 
       {/* Bottom Action Bar */}
