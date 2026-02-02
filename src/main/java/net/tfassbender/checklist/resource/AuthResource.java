@@ -25,8 +25,8 @@ public class AuthResource {
     @Path("/register")
     public Response register(RegisterRequest request) {
         try {
-            String token = authService.register(request.getUsername(), request.getPassword());
-            return Response.ok(new AuthResponse(token, request.getUsername().trim().toLowerCase())).build();
+            String token = authService.register(request.username(), request.password());
+            return Response.ok(new AuthResponse(token, request.username().trim().toLowerCase())).build();
         } catch (AuthService.AuthException e) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new ErrorResponse(e.getMessage(), 400))
@@ -38,8 +38,8 @@ public class AuthResource {
     @Path("/login")
     public Response login(LoginRequest request) {
         try {
-            String token = authService.login(request.getUsername(), request.getPassword());
-            return Response.ok(new AuthResponse(token, request.getUsername().trim().toLowerCase())).build();
+            String token = authService.login(request.username(), request.password());
+            return Response.ok(new AuthResponse(token, request.username().trim().toLowerCase())).build();
         } catch (AuthService.AuthException e) {
             return Response.status(Response.Status.UNAUTHORIZED)
                     .entity(new ErrorResponse(e.getMessage(), 401))

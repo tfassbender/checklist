@@ -31,7 +31,7 @@ public class ItemResource {
     @POST
     public Response addItem(@PathParam("listId") String listId, CreateItemRequest request) {
         try {
-            CheckListItem item = listService.addItem(getUsername(), listId, request.getDescription());
+            CheckListItem item = listService.addItem(getUsername(), listId, request.description());
             return Response.status(Response.Status.CREATED).entity(item).build();
         } catch (ListService.ListException e) {
             int status = e.getMessage().contains("not found") ? 404 : 400;
@@ -49,7 +49,7 @@ public class ItemResource {
         try {
             CheckListItem item = listService.updateItem(
                     getUsername(), listId, itemId,
-                    request.getDescription(), request.getChecked());
+                    request.description(), request.checked());
             return Response.ok(item).build();
         } catch (ListService.ListException e) {
             int status = e.getMessage().contains("not found") ? 404 : 400;
@@ -77,7 +77,7 @@ public class ItemResource {
     @Path("/reorder")
     public Response reorderItems(@PathParam("listId") String listId, ReorderItemsRequest request) {
         try {
-            CheckList list = listService.reorderItems(getUsername(), listId, request.getItemIds());
+            CheckList list = listService.reorderItems(getUsername(), listId, request.itemIds());
             return Response.ok(list).build();
         } catch (ListService.ListException e) {
             int status = e.getMessage().contains("not found") ? 404 : 400;

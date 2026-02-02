@@ -38,7 +38,7 @@ public class ListResource {
     @POST
     public Response createList(CreateListRequest request) {
         try {
-            CheckList list = listService.createList(getUsername(), request.getName());
+            CheckList list = listService.createList(getUsername(), request.name());
             return Response.status(Response.Status.CREATED).entity(list).build();
         } catch (ListService.ListException e) {
             int status = e.getMessage().contains("already exists") ? 409 : 400;
@@ -62,7 +62,7 @@ public class ListResource {
     @Path("/{id}")
     public Response updateList(@PathParam("id") String id, UpdateListRequest request) {
         try {
-            CheckList list = listService.updateList(getUsername(), id, request.getName(), request.getNotes());
+            CheckList list = listService.updateList(getUsername(), id, request.name(), request.notes());
             return Response.ok(list).build();
         } catch (ListService.ListException e) {
             int status = e.getMessage().contains("not found") ? 404 :

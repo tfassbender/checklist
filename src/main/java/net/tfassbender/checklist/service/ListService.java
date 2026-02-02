@@ -23,7 +23,7 @@ public class ListService {
     public List<CheckListSummary> getAllLists(String username) {
         return storageService.loadAllLists(username).stream()
                 .map(CheckListSummary::fromCheckList)
-                .sorted(Comparator.comparing(CheckListSummary::getUpdatedAt).reversed())
+                .sorted(Comparator.comparing(CheckListSummary::updatedAt).reversed())
                 .collect(Collectors.toList());
     }
 
